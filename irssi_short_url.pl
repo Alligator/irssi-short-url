@@ -8,12 +8,12 @@ sub getURL {
   my ($server, $msg, $nick, $addr, $target) = @_;
   my $isgd_api_request = "GET /create.php?format=simple&url=%s HTTP/1.1\r\nHost: is.gd\r\n\r\n";
 
-  return unless $msg =~ /.*(http:\/\/([^\/]+)[^\s]*)/;
+  return unless $msg =~ /.*(https?:\/\/([^\/]+)[^\s]*)/;
   my @tokens = split(/ /, $msg);
   my $out;
 
   foreach (@tokens) {
-    if ($_ =~ /.*(http:\/\/([^\/]+)[^\s]*)/) {
+    if ($_ =~ /.*(https?:\/\/([^\/]+)[^\s]*)/) {
       # we got a url
       my ($url, $domain) = ($1, $2);
 
