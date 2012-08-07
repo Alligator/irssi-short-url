@@ -6,38 +6,47 @@ use Irssi::Irc;
 
 sub getURL {
   my ($server, $msg, $nick, $addr, $target) = @_;
-
-  return 0 unless $msg =~ /.*(http:\/\/([^\/]+)[^\s]*)/;
-  my $url = $1;
-  my $domain = $2;
-
-  if (length($url) < 30) {
-    return;
-  }
-
   my $isgd_api_request = "GET /create.php?format=simple&url=%s HTTP/1.1\r\nHost: is.gd\r\n\r\n";
 
-  my $sock = new IO::Socket::INET(
-    PeerAddr => 'is.gd',
-    PeerPort => 'http(80)',
-    Proto    => 'tcp'
-  ) or die "ERROR in Socket Creation : $!\n";
+  return unless $msg =~ /.*(http:\/\/([^\/]+)[^\s]*)/;
+  my @tokens = split(/ /, $msg);
+  my $out;
 
-  my $request = sprintf($isgd_api_request, $url);
+  foreach (@tokens) {
+    if ($_ =~ /.*(http:\/\/([^\/]+)[^\s]*)/) {
+      # we got a url
+      my ($url, $domain) = ($1, $2);
 
-  $sock->send($request);
-  my $data;
-  $sock->recv($data, 1024);
+      if (length($url) < 30) {
+        $out .= "$_ ";
+        next;
+      }
 
-  $sock->close();
+      my $sock = new IO::Socket::INET(
+        PeerAddr => 'is.gd',
+        PeerPort => 'http(80)',
+        Proto    => 'tcp'
+      ) or die "ERROR in Socket Creation : $!\n";
 
-  $data =~ /(http.*)\r\n/;
+      my $request = sprintf($isgd_api_request, $url);
 
-  my $short = $1;
-  $msg =~ s/http:\/\/[^\s]*/$short ($domain)/;
+      $sock->send($request);
+      my $data;
+      $sock->recv($data, 1024);
 
-  #$server->print("$target", "$msg", MSGLEVEL_CLIENTCRAP);
-  Irssi::signal_continue($server, $msg, $nick, $addr, $target);
+      $sock->close();
+
+      $data =~ /(http.*)\r\n/;
+
+      my $short = "$1 ($domain)";
+      $msg =~ s/http:\/\/[^\s]*/$short ($domain)/;
+
+      $out .= "$short ";
+    } else {
+      $out .= "$_ ";
+    }
+  }
+  Irssi::signal_continue($server, $out, $nick, $addr, $target);
 }
 
 Irssi::signal_add_first("message public", "getURL");
