@@ -17,6 +17,7 @@ sub getURL {
       # we got a url
       my ($url, $domain) = ($1, $2);
 
+      # leave short urls be
       if (length($url) < 30) {
         $out .= "$_ ";
         next;
@@ -29,19 +30,15 @@ sub getURL {
       ) or die "ERROR in Socket Creation : $!\n";
 
       my $request = sprintf($isgd_api_request, $url);
+      my $data;
 
       $sock->send($request);
-      my $data;
       $sock->recv($data, 1024);
-
       $sock->close();
 
       $data =~ /(http.*)\r\n/;
 
-      my $short = "$1 ($domain)";
-      $msg =~ s/http:\/\/[^\s]*/$short ($domain)/;
-
-      $out .= "$short ";
+      $out .= "$1 ($domain) ";
     } else {
       $out .= "$_ ";
     }
