@@ -1,6 +1,7 @@
 use strict;
 
 use IO::Socket::INET;
+use CGI;
 use Irssi;
 use Irssi::Irc;
 
@@ -29,7 +30,7 @@ sub getURL {
         Proto    => 'tcp'
       ) or die "ERROR in Socket Creation : $!\n";
 
-      my $request = sprintf($isgd_api_request, $url);
+      my $request = sprintf($isgd_api_request, CGI::escape($url));
       my $data;
 
       $sock->send($request);
