@@ -2,26 +2,61 @@ use strict;
 
 use IO::Socket::INET;
 use CGI;
-use Irssi;
-use Irssi::Irc;
 
-# THINGS WHAT ARE WRONG
+use Irssi;
+
+use vars qw($VERSION %IRSSI);
+
+$VERSION = "0.1";
+%IRSSI = (
+  authors     => 'Reece Selwood',
+  contact     => 'contact@alligatr.co.uk',
+  name        => 'Short URL',
+  description => 'Shortern long URLs using is.gd.',
+  url         => 'https://github.com/Alligator/irssi-short-url',
+  license     => 'MIT'
+);
+
+# a lil script to shorten long URLs so they're easier to open if they break
+# lines. uses http://is.gd/ by default.
 #
-# swallows urls if something goes wrong
+# /set shorturl_url <url>
+#   default: "http://is.gd/create.php"
 #
-# sometimes fails on realllly crazy urls e.g.
-#   http://books.google.co.uk/books?id=QM3uQqDiAQIC&pg=PA24&dq=%22Bart+vs.+the+Space+Mutan+ts%22&hl=en&ei=Wb87Tr2MHY3u-gbh4oiUAg&sa=X&oi=book_result&ct=result&redir_esc=y#v=onepage&q=%22Bart%20vs.%20the%20Space%20Mutants%22&f=false
+# /set shorturl_params <params>
+#   default: "format=simple&url=%s"
+#
+# these are both sent to curl in the form:
+#   curl <url> -s -d <params>
+# where %s in the params is replace by the URL to be shortened.
+#
+# note that the output from curl is not parsed in any way, use apis that
+# return just the url in plain text. is.gd and v.gd both do this.
+
+my %CONFIG;
+
+sub init {
+  %CONFIG = (
+    url    => Irssi::settings_get_str("shorturl_url"),
+    params => Irssi::settings_get_str("shorturl_params"),
+  );
+  if (!length $CONFIG{url}) {
+    $CONFIG{url} = "http://is.gd/create.php";
+    Irssi::print("shorturl_url not set, defaulting to $CONFIG{url}");
+  }
+  if (!length $CONFIG{params}) {
+    $CONFIG{params} = "format=simple&url=%s";
+    Irssi::print("shorturl_params not set, defaulting to $CONFIG{params}");
+  }
+}
 
 my @lastURLs;
 
 sub getURL {
   my ($server, $msg, $nick, $addr, $target) = @_;
-  my $isgd_api_request = "GET /create.php?format=simple&url=%s HTTP/1.1\r\nHost: is.gd\r\n\r\n";
-
   return unless $msg =~ /.*(https?:\/\/([^\/]+)[^\s]*)/;
   my @tokens = split(/ /, $msg);
   my $out;
-
   foreach (@tokens) {
     if ($_ =~ /.*(https?:\/\/([^\/]+)[^\s]*)/) {
       # we got a url
@@ -33,22 +68,14 @@ sub getURL {
         next;
       }
 
-      my $sock = new IO::Socket::INET(
-        PeerAddr => 'is.gd',
-        PeerPort => 'http(80)',
-        Proto    => 'tcp'
-      ) or die "ERROR in Socket Creation : $!\n";
+      my $posturl = $CONFIG{url};
+      my $params = $CONFIG{params};
 
-      my $request = sprintf($isgd_api_request, CGI::escape($url));
-      my $data;
+      $params = sprintf($params, CGI::escape($url));
 
-      $sock->send($request);
-      $sock->recv($data, 1024);
-      $sock->close();
+      my $short = `/usr/bin/curl "$posturl" -s -d "$params"`;
 
-      $data =~ /(http.*)\r\n/;
-
-      $out .= "$1 ($domain) ";
+      $out .= "$short ($domain) ";
       if (scalar(@lastURLs) > 5) {
         shift(@lastURLs);
       }
@@ -60,12 +87,17 @@ sub getURL {
   Irssi::signal_continue($server, $out, $nick, $addr, $target);
 }
 
-# list the last 5 shortened urls
+# list the last 5 shortened urls, just in case it eats something.
 sub lastShortURL {
   foreach my $pair (@lastURLs) {
     Irssi::print(@$pair[0] . ' - ' . @$pair[1]);
   }
 }
+
+Irssi::settings_add_str("shorturl", "shorturl_url", '');
+Irssi::settings_add_str("shorturl", "shorturl_params", '');
+
+init();
 
 Irssi::signal_add_first("message public", "getURL");
 Irssi::signal_add_first("ctcp action", "getURL");
