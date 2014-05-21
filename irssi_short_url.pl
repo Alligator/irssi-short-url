@@ -107,3 +107,4 @@ init();
 
 Irssi::signal_add_first("message public", "getURL");
 Irssi::signal_add_first("ctcp action", "getURL");
+Irssi::command_bind("lastshorturls", "lastShortURL");
