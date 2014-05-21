@@ -21,17 +21,15 @@ $VERSION = "0.1";
 # lines. uses http://is.gd/ by default.
 #
 # /set shorturl_url <url>
-#   default: "http://is.gd/create.php"
-#
 # /set shorturl_params <params>
-#   default: "format=simple&url=%s"
 #
-# these are both sent to curl in the form:
-#   curl <url> -s -d <params>
-# where %s in the params is replace by the URL to be shortened.
+#   these are both sent to curl in the form:
+#     curl <url> -s -d <params>
+#   where %s in the params is replace by the URL to be shortened.
 #
-# note that the output from curl is not parsed in any way, use apis that
-# return just the url in plain text. is.gd and v.gd both do this.
+# /set shorturl_respre <regex>
+#   this is the regex used to parse out the url. for example if the api you're
+#   using returns the bare url it should be (.*).
 
 my %CONFIG;
 
@@ -39,14 +37,19 @@ sub init {
   %CONFIG = (
     url    => Irssi::settings_get_str("shorturl_url"),
     params => Irssi::settings_get_str("shorturl_params"),
+    respre => Irssi::settings_get_str("shorturl_respre"),
   );
   if (!length $CONFIG{url}) {
-    $CONFIG{url} = "http://is.gd/create.php";
+    $CONFIG{url} = "http://bombch.us/shorten/new";
     Irssi::print("shorturl_url not set, defaulting to $CONFIG{url}");
   }
   if (!length $CONFIG{params}) {
-    $CONFIG{params} = "format=simple&url=%s";
+    $CONFIG{params} = "url=%s";
     Irssi::print("shorturl_params not set, defaulting to $CONFIG{params}");
+  }
+  if (!length $CONFIG{respre}) {
+    $CONFIG{respre} = '"url":"([^"]*)\"';
+    Irssi::print("shorturl_respre not set, defaulting to $CONFIG{respre}");
   }
 }
 
@@ -63,7 +66,7 @@ sub getURL {
       my ($url, $domain) = ($1, $2);
 
       # leave short urls be
-      if (length($url) < 30) {
+      if (length($url) <= 30) {
         $out .= "$_ ";
         next;
       }
@@ -74,12 +77,14 @@ sub getURL {
       $params = sprintf($params, CGI::escape($url));
 
       my $short = `/usr/bin/curl "$posturl" -s -d "$params"`;
+      return unless $short =~ /.*(https?:\/\/([^\/]+)[^\s]*)/;
+      $short =~ /$CONFIG{respre}/;
 
-      $out .= "$short ($domain) ";
+      $out .= "$1 ($domain) ";
       if (scalar(@lastURLs) > 5) {
         shift(@lastURLs);
       }
-      push(@lastURLs, ([$1, $url]));
+      push(@lastURLs, ([$1, $short]));
     } else {
       $out .= "$_ ";
     }
@@ -96,9 +101,9 @@ sub lastShortURL {
 
 Irssi::settings_add_str("shorturl", "shorturl_url", '');
 Irssi::settings_add_str("shorturl", "shorturl_params", '');
+Irssi::settings_add_str("shorturl", "shorturl_respre", '');
 
 init();
 
 Irssi::signal_add_first("message public", "getURL");
 Irssi::signal_add_first("ctcp action", "getURL");
-Irssi::command_bind("lastshorturls", "lastShortURL");
