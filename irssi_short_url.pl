@@ -12,7 +12,7 @@ $VERSION = "0.1";
   authors     => 'Reece Selwood',
   contact     => 'contact@alligatr.co.uk',
   name        => 'Short URL',
-  description => 'Shortern long URLs using is.gd.',
+  description => 'Shorten long URLs using is.gd.',
   url         => 'https://github.com/Alligator/irssi-short-url',
   license     => 'MIT'
 );
